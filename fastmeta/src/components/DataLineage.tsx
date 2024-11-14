@@ -2,10 +2,16 @@ import { useEffect, useState, useRef } from 'react';
 import { Network } from 'vis-network/standalone';
 import { DataSet } from 'vis-data';
 import { Options } from 'vis-network/declarations/network/Network';
+import NodeEditModal from './NodeEditModal';
 
-interface Node {
+interface NodeData {
   id: number;
   label: string;
+  description?: string;
+  type?: 'source' | 'transform' | 'output';
+  properties?: {
+    [key: string]: string;
+  };
 }
 
 interface Edge {
@@ -15,17 +21,19 @@ interface Edge {
 }
 
 function DataLineage() {
-  const [nodesDataSet, setNodesDataSet] = useState<DataSet<Node>>();
+  const [nodesDataSet, setNodesDataSet] = useState<DataSet<NodeData>>();
   const [edgesDataSet, setEdgesDataSet] = useState<DataSet<Edge>>();
   const networkRef = useRef<Network | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     // サンプルデータの定義
-    const nodes = new DataSet<Node>([
-      { id: 1, label: 'データソース1' },
-      { id: 2, label: 'データ変換' },
-      { id: 3, label: '最終出力' }
+    const nodes = new DataSet<NodeData>([
+      { id: 1, label: 'データソース1', type: 'source' },
+      { id: 2, label: 'データ変換', type: 'transform' },
+      { id: 3, label: '最終出力', type: 'output' }
     ]);
 
     const edges = new DataSet<Edge>([
@@ -58,15 +66,6 @@ function DataLineage() {
       manipulation: {
         enabled: false,
         initiallyActive: false,
-        editNode: function(nodeData: any, callback: any) {
-          const newLabel = prompt('ノード名を入力してください:', nodeData.label);
-          if (newLabel !== null) {
-            nodeData.label = newLabel;
-            callback(nodeData);
-          } else {
-            callback(null);
-          }
-        },
         addNode: true,
         addEdge: true,
         deleteNode: true,
@@ -84,7 +83,32 @@ function DataLineage() {
     if (container) {
       networkRef.current = new Network(container, { nodes, edges }, options);
     }
+
+    return () => {
+      if (networkRef.current) {
+        networkRef.current.destroy();
+      }
+    };
   }, []);
+
+  // イベントリスナーの設定
+  useEffect(() => {
+    if (networkRef.current && nodesDataSet) {
+      networkRef.current.on('doubleClick', (params) => {
+        console.log('Double click detected:', params);
+        if (params.nodes.length > 0) {
+          const nodeId = params.nodes[0];
+          const node = nodesDataSet.get(nodeId);
+          console.log('Selected node:', node);
+          if (node) {
+            setSelectedNode(node as NodeData);
+            setIsModalOpen(true);
+            console.log('Modal should open now');
+          }
+        }
+      });
+    }
+  }, [networkRef.current, nodesDataSet]);
 
   const handleToggleEdit = () => {
     if (networkRef.current) {
@@ -94,6 +118,12 @@ function DataLineage() {
           enabled: !isEditMode
         }
       });
+    }
+  };
+
+  const handleSaveNode = (updatedNode: NodeData) => {
+    if (nodesDataSet) {
+      nodesDataSet.update(updatedNode);
     }
   };
 
@@ -111,6 +141,21 @@ function DataLineage() {
         </button>
       </div>
       <div id="network" style={{ height: '500px', border: '1px solid #ddd' }} />
+      
+      {console.log('Modal state:', { isModalOpen, selectedNode })}
+      <NodeEditModal
+        node={selectedNode}
+        isOpen={isModalOpen}
+        onClose={() => {
+          console.log('Modal closing');
+          setIsModalOpen(false);
+          setSelectedNode(null);
+        }}
+        onSave={(updatedNode) => {
+          console.log('Saving node:', updatedNode);
+          handleSaveNode(updatedNode);
+        }}
+      />
     </div>
   );
 }
