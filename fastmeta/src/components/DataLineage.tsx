@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Network } from 'vis-network/standalone';
 import { DataSet } from 'vis-data';
 import { Options } from 'vis-network/declarations/network/Network';
-import NodeEditModal from './NodeEditModal';
+import NodeEditPanel from './NodeEditPanel';  // インポート名を変更
 
 interface NodeData {
   id: number;
@@ -108,7 +108,7 @@ function DataLineage() {
           if (node) {
             setSelectedNode(node as NodeData);
             setIsModalOpen(true);
-            console.log('Modal should open now');
+            console.log('Panel should open now');
           }
         }
       });
@@ -176,7 +176,7 @@ function DataLineage() {
   };
 
   return (
-    <div>
+    <div style={{ position: 'relative', height: '100vh' }}>
       <div className="controls" style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button 
           onClick={handleToggleEdit}
@@ -212,9 +212,14 @@ function DataLineage() {
         </label>
       </div>
 
-      <div id="network" style={{ height: '500px', border: '1px solid #ddd' }} />
+      <div id="network" style={{ 
+        height: 'calc(100% - 60px)', 
+        border: '1px solid #ddd',
+        marginRight: isModalOpen ? '400px' : '0',
+        transition: 'margin-right 0.3s ease'
+      }} />
       
-      <NodeEditModal
+      <NodeEditPanel
         node={selectedNode}
         isOpen={isModalOpen}
         onClose={() => {
