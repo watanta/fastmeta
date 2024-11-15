@@ -2,7 +2,8 @@ import { useEffect, useState, useRef } from 'react';
 import { Network } from 'vis-network/standalone';
 import { DataSet } from 'vis-data';
 import { Options } from 'vis-network/declarations/network/Network';
-import NodeEditPanel from './NodeEditPanel';  // インポート名を変更
+import NodeEditPanel from './NodeEditPanel';
+import SearchPanel from './SearchPanel';
 
 interface NodeData {
   id: number;
@@ -36,9 +37,27 @@ function DataLineage() {
   useEffect(() => {
     // サンプルデータの定義
     const nodes = new DataSet<NodeData>([
-      { id: 1, label: 'データソース1', type: 'source' },
-      { id: 2, label: 'データ変換', type: 'transform' },
-      { id: 3, label: '最終出力', type: 'output' }
+      { 
+        id: 1, 
+        label: 'データソース1', 
+        type: 'source',
+        description: 'ソースの説明',
+        properties: { 'データ形式': 'CSV', '更新頻度': '日次' }
+      },
+      { 
+        id: 2, 
+        label: 'データ変換', 
+        type: 'transform',
+        description: '変換処理の説明',
+        properties: { '処理タイプ': '集計', '出力形式': 'JSON' }
+      },
+      { 
+        id: 3, 
+        label: '最終出力', 
+        type: 'output',
+        description: '出力の説明',
+        properties: { '保存先': 'S3', 'フォーマット': 'Parquet' }
+      }
     ]);
 
     const edges = new DataSet<Edge>([
@@ -63,57 +82,56 @@ function DataLineage() {
         color: {
           background: '#ffffff',
           border: '#2B7CE9'
+        },
+        font: {
+          size: 14
         }
       },
       edges: {
         arrows: 'to'
       },
       manipulation: {
-        enabled: false,
-        initiallyActive: false,
-        addNode: true,
-        addEdge: true,
-        deleteNode: true,
-        deleteEdge: true
+        enabled: false
       },
       interaction: {
         multiselect: true,
         selectConnectedEdges: true,
         hover: true
+      },
+      physics: {
+        enabled: true,
+        solver: 'hierarchicalRepulsion',
+        hierarchicalRepulsion: {
+          nodeDistance: 150
+        }
       }
     };
 
     // ネットワークの描画
     const container = document.getElementById('network');
-    if (container) {
+    if (container && !networkRef.current) {
       networkRef.current = new Network(container, { nodes, edges }, options);
+
+      // ダブルクリックイベントの設定
+      networkRef.current.on('doubleClick', (params) => {
+        if (params.nodes.length > 0) {
+          const nodeId = params.nodes[0];
+          const node = nodes.get(nodeId);
+          if (node) {
+            setSelectedNode(node as NodeData);
+            setIsModalOpen(true);
+          }
+        }
+      });
     }
 
     return () => {
       if (networkRef.current) {
         networkRef.current.destroy();
+        networkRef.current = null;
       }
     };
   }, []);
-
-  // イベントリスナーの設定
-  useEffect(() => {
-    if (networkRef.current && nodesDataSet) {
-      networkRef.current.on('doubleClick', (params) => {
-        console.log('Double click detected:', params);
-        if (params.nodes.length > 0) {
-          const nodeId = params.nodes[0];
-          const node = nodesDataSet.get(nodeId);
-          console.log('Selected node:', node);
-          if (node) {
-            setSelectedNode(node as NodeData);
-            setIsModalOpen(true);
-            console.log('Panel should open now');
-          }
-        }
-      });
-    }
-  }, [networkRef.current, nodesDataSet]);
 
   const handleToggleEdit = () => {
     if (networkRef.current) {
@@ -137,7 +155,6 @@ function DataLineage() {
       const nodes = nodesDataSet.get() as NodeData[];
       const edges = edgesDataSet.get() as Edge[];
       
-      // 全てのノードデータを含むオブジェクトを作成
       const graphData: GraphData = {
         nodes: nodes.map(node => ({
           id: node.id,
@@ -172,7 +189,6 @@ function DataLineage() {
         try {
           const graphData: GraphData = JSON.parse(e.target?.result as string);
           
-          // 各ノードのプロパティが存在することを確認
           const validatedNodes = graphData.nodes.map(node => ({
             ...node,
             description: node.description || '',
@@ -195,9 +211,72 @@ function DataLineage() {
     }
   };
 
+  const handleHighlight = (nodeIds: number[]) => {
+    if (nodesDataSet && networkRef.current) {
+      const allNodes = nodesDataSet.get();
+      
+      if (nodeIds.length === 0) {
+        // 検索結果がない場合は全てのノードを通常表示
+        allNodes.forEach(node => {
+          nodesDataSet.update({
+            id: node.id,
+            color: undefined,  // デフォルトの色に戻す
+            opacity: undefined // デフォルトの透明度に戻す
+          });
+        });
+      } else {
+        // 検索結果に応じてノードの表示を更新
+        allNodes.forEach(node => {
+          if (nodeIds.includes(node.id)) {
+            // 検索にマッチしたノード
+            nodesDataSet.update({
+              id: node.id,
+              color: {
+                background: '#ffff99',
+                border: '#ffa500'
+              },
+              opacity: 1
+            });
+          } else {
+            // マッチしなかったノード
+            nodesDataSet.update({
+              id: node.id,
+              color: {
+                background: '#ffffff',
+                border: '#2B7CE9'
+              },
+              opacity: 0.3
+            });
+          }
+        });
+
+        // マッチしたノードにフォーカス
+        networkRef.current.focus(nodeIds[0], {
+          scale: 1,
+          animation: {
+            duration: 500,
+            easingFunction: 'easeInOutQuad'
+          }
+        });
+      }
+    }
+  };
+
   return (
-    <div style={{ position: 'relative', height: '100vh' }}>
-      <div className="controls" style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+    <div style={{ 
+      position: 'relative', 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column',
+      overflow: 'hidden'  // これを追加
+    }}>
+      <div className="controls" style={{ 
+        padding: '10px', 
+        display: 'flex', 
+        gap: '10px', 
+        borderBottom: '1px solid #ddd',
+        flexShrink: 0  // これを追加
+      }}>
         <button 
           onClick={handleToggleEdit}
           style={{ 
@@ -232,11 +311,22 @@ function DataLineage() {
         </label>
       </div>
 
+      <div style={{ 
+        flexShrink: 0,  // これを追加
+        borderBottom: '1px solid #ddd' 
+      }}>
+        <SearchPanel 
+          nodesDataSet={nodesDataSet}
+          onHighlight={handleHighlight}
+        />
+      </div>
+
       <div id="network" style={{ 
-        height: 'calc(100% - 60px)', 
+        flex: 1,
         border: '1px solid #ddd',
         marginRight: isModalOpen ? '400px' : '0',
-        transition: 'margin-right 0.3s ease'
+        transition: 'margin-right 0.3s ease',
+        overflow: 'hidden'  // これを追加
       }} />
       
       <NodeEditPanel
