@@ -34,9 +34,46 @@ function DataLineage() {
   const [selectedNode, setSelectedNode] = useState<NodeData | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const getNodeStyle = (type: string = 'transform') => {
+    switch (type) {
+      case 'source':
+        return {
+          shape: 'diamond',
+          color: {
+            background: '#D5E8D4',  // 薄緑
+            border: '#82B366'       // 濃緑
+          }
+        };
+      case 'transform':
+        return {
+          shape: 'box',
+          color: {
+            background: '#DAE8FC',  // 薄青
+            border: '#6C8EBF'       // 濃青
+          }
+        };
+      case 'output':
+        return {
+          shape: 'circle',
+          color: {
+            background: '#FFE6CC',  // 薄橙
+            border: '#D79B00'       // 濃橙
+          }
+        };
+      default:
+        return {
+          shape: 'box',
+          color: {
+            background: '#DAE8FC',
+            border: '#6C8EBF'
+          }
+        };
+    }
+  };
+
   useEffect(() => {
     // サンプルデータの定義
-    const nodes = new DataSet<NodeData>([
+    const initialNodes = [
       { 
         id: 1, 
         label: 'データソース1', 
@@ -58,8 +95,15 @@ function DataLineage() {
         description: '出力の説明',
         properties: { '保存先': 'S3', 'フォーマット': 'Parquet' }
       }
-    ]);
+    ];
 
+    // 各ノードにスタイルを適用
+    const nodesWithStyles = initialNodes.map(node => ({
+      ...node,
+      ...getNodeStyle(node.type)
+    }));
+
+    const nodes = new DataSet<NodeData>(nodesWithStyles);
     const edges = new DataSet<Edge>([
       { from: 1, to: 2 },
       { from: 2, to: 3 }
@@ -71,24 +115,26 @@ function DataLineage() {
     // 描画オプション
     const options: Options = {
       nodes: {
-        shape: 'box',
-        margin: {
-          top: 10,
-          right: 10,
-          bottom: 10,
-          left: 10
-        },
-        borderWidth: 1,
-        color: {
-          background: '#ffffff',
-          border: '#2B7CE9'
-        },
+        borderWidth: 2,
+        margin: 10,
+        size: 30,        // ノードのサイズ
         font: {
-          size: 14
+          size: 14,
+          color: '#333333',
+          face: 'arial'
         }
       },
       edges: {
-        arrows: 'to'
+        arrows: 'to',
+        smooth: {
+          type: 'cubicBezier',
+          forceDirection: 'horizontal',
+          roundness: 0.4
+        },
+        color: {
+          color: '#999999',
+          highlight: '#666666'
+        }
       },
       manipulation: {
         enabled: false
@@ -146,7 +192,11 @@ function DataLineage() {
 
   const handleSaveNode = (updatedNode: NodeData) => {
     if (nodesDataSet) {
-      nodesDataSet.update(updatedNode);
+      const nodeStyle = getNodeStyle(updatedNode.type);
+      nodesDataSet.update({
+        ...updatedNode,
+        ...nodeStyle
+      });
     }
   };
 
@@ -189,12 +239,16 @@ function DataLineage() {
         try {
           const graphData: GraphData = JSON.parse(e.target?.result as string);
           
-          const validatedNodes = graphData.nodes.map(node => ({
-            ...node,
-            description: node.description || '',
-            type: node.type || 'transform',
-            properties: node.properties || {}
-          }));
+          const validatedNodes = graphData.nodes.map(node => {
+            const nodeStyle = getNodeStyle(node.type);
+            return {
+              ...node,
+              description: node.description || '',
+              type: node.type || 'transform',
+              properties: node.properties || {},
+              ...nodeStyle
+            };
+          });
 
           if (nodesDataSet && edgesDataSet) {
             nodesDataSet.clear();
@@ -215,41 +269,34 @@ function DataLineage() {
     if (nodesDataSet && networkRef.current) {
       const allNodes = nodesDataSet.get();
       
-      if (nodeIds.length === 0) {
-        // 検索結果がない場合は全てのノードを通常表示
-        allNodes.forEach(node => {
+      allNodes.forEach(node => {
+        const baseStyle = getNodeStyle(node.type);
+        
+        if (nodeIds.length === 0) {
+          // 検索結果がない場合は元のスタイルに戻す
           nodesDataSet.update({
             id: node.id,
-            color: undefined,  // デフォルトの色に戻す
-            opacity: undefined // デフォルトの透明度に戻す
+            ...baseStyle,
+            opacity: undefined
           });
-        });
-      } else {
-        // 検索結果に応じてノードの表示を更新
-        allNodes.forEach(node => {
-          if (nodeIds.includes(node.id)) {
-            // 検索にマッチしたノード
-            nodesDataSet.update({
-              id: node.id,
-              color: {
-                background: '#ffff99',
-                border: '#ffa500'
-              },
-              opacity: 1
-            });
-          } else {
-            // マッチしなかったノード
-            nodesDataSet.update({
-              id: node.id,
-              color: {
-                background: '#ffffff',
-                border: '#2B7CE9'
-              },
-              opacity: 0.3
-            });
-          }
-        });
+        } else if (nodeIds.includes(node.id)) {
+          // 検索にマッチしたノード
+          nodesDataSet.update({
+            id: node.id,
+            ...baseStyle,
+            opacity: 1
+          });
+        } else {
+          // マッチしなかったノード
+          nodesDataSet.update({
+            id: node.id,
+            ...baseStyle,
+            opacity: 0.3
+          });
+        }
+      });
 
+      if (nodeIds.length > 0) {
         // マッチしたノードにフォーカス
         networkRef.current.focus(nodeIds[0], {
           scale: 1,
@@ -268,14 +315,14 @@ function DataLineage() {
       height: '100vh', 
       display: 'flex', 
       flexDirection: 'column',
-      overflow: 'hidden'  // これを追加
+      overflow: 'hidden'
     }}>
       <div className="controls" style={{ 
         padding: '10px', 
         display: 'flex', 
         gap: '10px', 
         borderBottom: '1px solid #ddd',
-        flexShrink: 0  // これを追加
+        flexShrink: 0
       }}>
         <button 
           onClick={handleToggleEdit}
@@ -312,7 +359,7 @@ function DataLineage() {
       </div>
 
       <div style={{ 
-        flexShrink: 0,  // これを追加
+        flexShrink: 0,
         borderBottom: '1px solid #ddd' 
       }}>
         <SearchPanel 
@@ -326,7 +373,7 @@ function DataLineage() {
         border: '1px solid #ddd',
         marginRight: isModalOpen ? '400px' : '0',
         transition: 'margin-right 0.3s ease',
-        overflow: 'hidden'  // これを追加
+        overflow: 'hidden'
       }} />
       
       <NodeEditPanel
