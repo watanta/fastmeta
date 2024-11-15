@@ -20,6 +20,11 @@ interface Edge {
   to: number;
 }
 
+interface GraphData {
+  nodes: NodeData[];
+  edges: Edge[];
+}
+
 function DataLineage() {
   const [nodesDataSet, setNodesDataSet] = useState<DataSet<NodeData>>();
   const [edgesDataSet, setEdgesDataSet] = useState<DataSet<Edge>>();
@@ -127,9 +132,52 @@ function DataLineage() {
     }
   };
 
+  const handleExport = () => {
+    if (nodesDataSet && edgesDataSet) {
+      const graphData: GraphData = {
+        nodes: nodesDataSet.get() as NodeData[],
+        edges: edgesDataSet.get() as Edge[]
+      };
+      
+      const jsonString = JSON.stringify(graphData, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'graph-data.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const graphData: GraphData = JSON.parse(e.target?.result as string);
+          if (nodesDataSet && edgesDataSet) {
+            nodesDataSet.clear();
+            edgesDataSet.clear();
+            nodesDataSet.add(graphData.nodes);
+            edgesDataSet.add(graphData.edges);
+          }
+        } catch (error) {
+          console.error('Invalid JSON file:', error);
+          alert('無効なJSONファイルです。');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
   return (
     <div>
-      <div className="controls" style={{ marginBottom: '20px' }}>
+      <div className="controls" style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
         <button 
           onClick={handleToggleEdit}
           style={{ 
@@ -139,22 +187,41 @@ function DataLineage() {
         >
           編集モード {isEditMode ? 'ON' : 'OFF'}
         </button>
+
+        <button 
+          onClick={handleExport}
+          style={{ padding: '5px 10px' }}
+        >
+          エクスポート
+        </button>
+
+        <label style={{ 
+          padding: '5px 10px',
+          backgroundColor: '#f0f0f0',
+          cursor: 'pointer',
+          border: '1px solid #ccc',
+          borderRadius: '4px'
+        }}>
+          インポート
+          <input
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            style={{ display: 'none' }}
+          />
+        </label>
       </div>
+
       <div id="network" style={{ height: '500px', border: '1px solid #ddd' }} />
       
-      {console.log('Modal state:', { isModalOpen, selectedNode })}
       <NodeEditModal
         node={selectedNode}
         isOpen={isModalOpen}
         onClose={() => {
-          console.log('Modal closing');
           setIsModalOpen(false);
           setSelectedNode(null);
         }}
-        onSave={(updatedNode) => {
-          console.log('Saving node:', updatedNode);
-          handleSaveNode(updatedNode);
-        }}
+        onSave={handleSaveNode}
       />
     </div>
   );
