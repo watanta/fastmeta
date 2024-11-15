@@ -24,18 +24,38 @@ function SearchPanel({ nodesDataSet, onHighlight }: SearchPanelProps) {
   const [propertyFilters, setPropertyFilters] = useState<{ key: string; value: string }[]>([]);
   const [availableProperties, setAvailableProperties] = useState<string[]>([]);
 
+  const updateAvailableProperties = (filters: { key: string; value: string }[]) => {
+    if (!nodesDataSet) return;
+
+    const allNodes = nodesDataSet.get();
+    const properties = new Set<string>();
+    
+    // ノードが持つ全てのプロパティを収集
+    allNodes.forEach(node => {
+      if (node.properties) {
+        Object.keys(node.properties).forEach(key => properties.add(key));
+      }
+    });
+
+    // 現在のフィルターのキーも追加
+    filters.forEach(filter => {
+      if (filter.key) {
+        properties.add(filter.key);
+      }
+    });
+
+    const sortedProperties = Array.from(properties).sort();
+    console.log('Updated available properties:', sortedProperties);
+    setAvailableProperties(sortedProperties);
+  };
+
   useEffect(() => {
-    if (nodesDataSet) {
-      const allNodes = nodesDataSet.get();
-      const properties = new Set<string>();
-      allNodes.forEach(node => {
-        if (node.properties) {
-          Object.keys(node.properties).forEach(key => properties.add(key));
-        }
-      });
-      setAvailableProperties(Array.from(properties));
-    }
-  }, [nodesDataSet]);
+    console.log('Effect triggered:', {
+      hasNodesDataSet: !!nodesDataSet,
+      propertyFilters
+    });
+    updateAvailableProperties(propertyFilters);
+  }, [nodesDataSet, propertyFilters]);
 
   const handleSearch = () => {
     if (!nodesDataSet) return;
@@ -96,15 +116,19 @@ function SearchPanel({ nodesDataSet, onHighlight }: SearchPanelProps) {
   };
 
   const addPropertyFilter = () => {
-    setPropertyFilters([...propertyFilters, { key: '', value: '' }]);
+    console.log('Adding new property filter');
+    const newFilters = [...propertyFilters, { key: '', value: '' }];
+    setPropertyFilters(newFilters);
   };
 
   const removePropertyFilter = (index: number) => {
+    console.log('Removing property filter at index:', index);
     const newFilters = propertyFilters.filter((_, i) => i !== index);
     setPropertyFilters(newFilters);
   };
 
   const handlePropertyKeyChange = (index: number, newKey: string) => {
+    console.log('Property key changed:', { index, newKey });
     const newFilters = [...propertyFilters];
     newFilters[index].key = newKey;
     setPropertyFilters(newFilters);
@@ -120,7 +144,7 @@ function SearchPanel({ nodesDataSet, onHighlight }: SearchPanelProps) {
     setSearchTerm('');
     setSelectedType('all');
     setPropertyFilters([]);
-    onHighlight([]);  // ハイライトをクリア
+    onHighlight([]);
   };
 
   return (
