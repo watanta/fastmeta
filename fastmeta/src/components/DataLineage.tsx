@@ -134,9 +134,19 @@ function DataLineage() {
 
   const handleExport = () => {
     if (nodesDataSet && edgesDataSet) {
+      const nodes = nodesDataSet.get() as NodeData[];
+      const edges = edgesDataSet.get() as Edge[];
+      
+      // 全てのノードデータを含むオブジェクトを作成
       const graphData: GraphData = {
-        nodes: nodesDataSet.get() as NodeData[],
-        edges: edgesDataSet.get() as Edge[]
+        nodes: nodes.map(node => ({
+          id: node.id,
+          label: node.label,
+          description: node.description || '',
+          type: node.type || 'transform',
+          properties: node.properties || {}
+        })),
+        edges: edges
       };
       
       const jsonString = JSON.stringify(graphData, null, 2);
@@ -145,7 +155,8 @@ function DataLineage() {
       
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'graph-data.json';
+      const date = new Date().toISOString().split('T')[0];
+      link.download = `graph-data-${date}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -160,10 +171,19 @@ function DataLineage() {
       reader.onload = (e) => {
         try {
           const graphData: GraphData = JSON.parse(e.target?.result as string);
+          
+          // 各ノードのプロパティが存在することを確認
+          const validatedNodes = graphData.nodes.map(node => ({
+            ...node,
+            description: node.description || '',
+            type: node.type || 'transform',
+            properties: node.properties || {}
+          }));
+
           if (nodesDataSet && edgesDataSet) {
             nodesDataSet.clear();
             edgesDataSet.clear();
-            nodesDataSet.add(graphData.nodes);
+            nodesDataSet.add(validatedNodes);
             edgesDataSet.add(graphData.edges);
           }
         } catch (error) {
