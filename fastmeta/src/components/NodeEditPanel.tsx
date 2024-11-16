@@ -1,14 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// window.electron の型定義
-declare global {
-  interface Window {
-    electron: {
-      checkPath: (path: string) => Promise<boolean>;
-    };
-  }
-}
-
 interface NodeData {
   id: number;
   label: string;
@@ -29,12 +20,17 @@ interface NodeEditPanelProps {
   onSave: (node: NodeData) => void;
 }
 
+interface PathProperty {
+  key: string;
+  value: string;
+  type: 'local';
+}
+
 function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
   const [editedNode, setEditedNode] = useState<NodeData | null>(null);
   const [properties, setProperties] = useState<{key: string, value: string}[]>([]);
-  const [pathProperties, setPathProperties] = useState<{key: string, value: string}[]>([]);
+  const [pathProperties, setPathProperties] = useState<PathProperty[]>([]);
   const [pathValidationStates, setPathValidationStates] = useState<{[key: string]: boolean | null}>({});
-
 
   useEffect(() => {
     if (node) {
@@ -43,7 +39,11 @@ function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
         Object.entries(node.properties || {}).map(([key, value]) => ({ key, value }))
       );
       setPathProperties(
-        Object.entries(node.pathProperties || {}).map(([key, value]) => ({ key, value }))
+        Object.entries(node.pathProperties || {}).map(([key, value]) => ({ 
+          key, 
+          value,
+          type: 'local'
+        }))
       );
     }
   }, [node]);
@@ -66,18 +66,42 @@ function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
     onClose();
   };
 
-  const handleCheckPath = async (key: string, path: string) => {
+  const handleCheckPath = async (property: PathProperty) => {
+    console.log('Starting path check for:', property);
+  
     try {
-      const exists = await window.electron.checkPath(path);
+      const requestBody = {
+        path: property.value,
+        type: property.type
+      };
+      console.log('Sending request:', requestBody);
+  
+      const response = await fetch('/api/check-path', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+  
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      console.log('Response data:', data);
+  
       setPathValidationStates(prev => ({
         ...prev,
-        [key]: exists
+        [property.key]: data.exists
       }));
     } catch (error) {
       console.error('Path check failed:', error);
       setPathValidationStates(prev => ({
         ...prev,
-        [key]: false
+        [property.key]: false
       }));
     }
   };
@@ -226,7 +250,10 @@ function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
               }}
             />
             <button
-              onClick={() => handleCheckPath(prop.key, prop.value)}
+              onClick={() => {
+                console.log('Check button clicked for:', prop);
+                handleCheckPath(prop);
+              }}
               disabled={!prop.key || !prop.value}
               style={{
                 padding: '5px 10px',
@@ -249,7 +276,7 @@ function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
           </div>
         ))}
         <button 
-          onClick={() => setPathProperties([...pathProperties, { key: '', value: '' }])}
+          onClick={() => setPathProperties([...pathProperties, { key: '', value: '', type: 'local' }])}
           style={{ marginTop: '10px' }}
         >
           パスプロパティを追加
