@@ -13,6 +13,9 @@ interface NodeData {
   properties?: {
     [key: string]: string;
   };
+  pathProperties?: {
+    [key: string]: string;
+  };
 }
 
 interface Edge {
