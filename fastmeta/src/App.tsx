@@ -4,7 +4,7 @@ import DataLineage from './components/DataLineage'
 function App() {
   return (
     <div className="App">
-      <h1>Fastmeta - データリネージュ</h1>
+      <h1>Fastmeta </h1>
       <DataLineage />
     </div>
   )
