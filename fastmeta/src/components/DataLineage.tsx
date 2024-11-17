@@ -76,27 +76,40 @@ function DataLineage() {
 
   useEffect(() => {
     // サンプルデータの定義
+// サンプルデータの定義
     const initialNodes = [
       { 
         id: 1, 
         label: 'データソース1', 
         type: 'source',
         description: 'ソースの説明',
-        properties: { 'データ形式': 'CSV', '更新頻度': '日次' }
+        properties: { 'データ形式': 'CSV', '更新頻度': '日次' },
+        pathProperties: {
+          'configFile': '/home/watanabe/fastmeta/fastmeta/backend/package.json',  // 実在するパス
+          'dataPath': '/home/watanabe/fastmeta/fastmeta/backend/not_exists.csv'   // 存在しないパス
+        }
       },
       { 
         id: 2, 
         label: 'データ変換', 
         type: 'transform',
         description: '変換処理の説明',
-        properties: { '処理タイプ': '集計', '出力形式': 'JSON' }
+        properties: { '処理タイプ': '集計', '出力形式': 'JSON' },
+        pathProperties: {
+          'scriptDir': '/home/watanabe/fastmeta/fastmeta/src',           // 実在するパス
+          'logFile': '/home/watanabe/fastmeta/fastmeta/not_exist_src'   // 存在しないパス
+        }
       },
       { 
         id: 3, 
         label: '最終出力', 
         type: 'output',
         description: '出力の説明',
-        properties: { '保存先': 'S3', 'フォーマット': 'Parquet' }
+        properties: { '保存先': 'S3', 'フォーマット': 'Parquet' },
+        pathProperties: {
+          'readmeFile': '/home/watanabe/fastmeta/fastmeta/README.md',         // 実在するパス
+          'outputPath': '/home/watanabe/fastmeta/fastmeta/not_exits_README.md' // 存在しないパス
+        }
       }
     ];
 
