@@ -1,17 +1,9 @@
 import React, { useState, useEffect } from 'react';
-
-interface NodeData {
-  id: number;
-  label: string;
-  description?: string;
-  type?: 'source' | 'transform' | 'output';
-  properties?: {
-    [key: string]: string;
-  };
-  pathProperties?: {
-    [key: string]: string;
-  };
-}
+import { useDatasetVersions } from '../hooks/useDatasetVersions';
+import DatasetVersionControl from './DatasetVersionControl';
+import type { NodeData } from '../types/index';
+import type { DatasetNodeData } from '../types/dataset';
+import '../styles/DatasetVersionControl.css';
 
 interface NodeEditPanelProps {
   node: NodeData | null;
@@ -20,117 +12,136 @@ interface NodeEditPanelProps {
   onSave: (node: NodeData) => void;
 }
 
-interface PathProperty {
-  key: string;
-  value: string;
-  type: 'local';
-}
-
-function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
+const NodeEditPanel: React.FC<NodeEditPanelProps> = ({
+  node,
+  isOpen,
+  onClose,
+  onSave
+}) => {
   const [editedNode, setEditedNode] = useState<NodeData | null>(null);
-  const [properties, setProperties] = useState<{key: string, value: string}[]>([]);
-  const [pathProperties, setPathProperties] = useState<PathProperty[]>([]);
-  const [pathValidationStates, setPathValidationStates] = useState<{[key: string]: boolean | null}>({});
+  const isDatasetNode = node?.type === 'source';
+
+  // データセットバージョン管理フックの初期化
+  const {
+    versions,
+    currentVersion,
+    createVersion,
+    switchVersion,
+    deleteVersion,
+    exportVersions,
+    importVersions,
+    getVersionData
+  } = useDatasetVersions(node as DatasetNodeData);
 
   useEffect(() => {
     if (node) {
-      setEditedNode(node);
-      setProperties(
-        Object.entries(node.properties || {}).map(([key, value]) => ({ key, value }))
-      );
-      setPathProperties(
-        Object.entries(node.pathProperties || {}).map(([key, value]) => ({ 
-          key, 
-          value,
-          type: 'local'
-        }))
-      );
+      setEditedNode({ ...node });
     }
   }, [node]);
 
+  if (!editedNode) return null;
+
+  const handlePropertyChange = (key: string, value: string) => {
+    setEditedNode(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        properties: {
+          ...prev.properties,
+          [key]: value
+        }
+      };
+    });
+  };
+
+  const handlePathPropertyChange = (key: string, value: string) => {
+    setEditedNode(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        pathProperties: {
+          ...prev.pathProperties,
+          [key]: value
+        }
+      };
+    });
+  };
+
   const handleSave = () => {
     if (editedNode) {
-      const updatedNode = {
-        ...editedNode,
-        properties: properties.reduce((acc, { key, value }) => {
-          if (key) acc[key] = value;
-          return acc;
-        }, {} as {[key: string]: string}),
-        pathProperties: pathProperties.reduce((acc, { key, value }) => {
-          if (key) acc[key] = value;
-          return acc;
-        }, {} as {[key: string]: string})
-      };
-      onSave(updatedNode);
+      if (isDatasetNode) {
+        // データセットノードの場合、バージョン情報も含めて保存
+        onSave({
+          ...editedNode,
+          ...getVersionData()
+        });
+      } else {
+        onSave(editedNode);
+      }
     }
     onClose();
   };
 
-  const handleCheckPath = async (property: PathProperty) => {
-    console.log('Starting path check for:', property);
-  
-    try {
-      const requestBody = {
-        path: property.value,
-        type: property.type
-      };
-      console.log('Sending request:', requestBody);
-  
-      const response = await fetch('/api/check-path', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-  
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  const handleVersionCreate = (path: string, description: string) => {
+    // TODO: ここでメタデータを取得する処理を追加
+    const metadata = {
+      size: 0,
+      rowCount: 0,
+      columns: []
+    };
+    createVersion(path, description, metadata);
+  };
+
+  const handleVersionExport = () => {
+    const json = exportVersions();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dataset-versions-${new Date().toISOString()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleVersionImport = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const content = e.target?.result as string;
+          importVersions(content);
+        };
+        reader.readAsText(file);
       }
-  
-      const data = await response.json();
-      console.log('Response data:', data);
-  
-      setPathValidationStates(prev => ({
-        ...prev,
-        [property.key]: data.exists
-      }));
-    } catch (error) {
-      console.error('Path check failed:', error);
-      setPathValidationStates(prev => ({
-        ...prev,
-        [property.key]: false
-      }));
-    }
+    };
+    input.click();
   };
-
-  const getValidationColor = (key: string): string => {
-    const state = pathValidationStates[key];
-    if (state === null) return '#808080'; // 未チェック
-    return state ? '#4CAF50' : '#f44336'; // 成功は緑、失敗は赤
-  };
-
-  if (!isOpen || !editedNode) return null;
 
   return (
-    <div className="side-panel" style={{
+    <div style={{
       position: 'fixed',
       top: 0,
-      right: 0,
+      right: isOpen ? 0 : '-400px',
       width: '400px',
       height: '100vh',
       backgroundColor: 'white',
       boxShadow: '-2px 0 5px rgba(0,0,0,0.1)',
-      padding: '20px',
+      transition: 'right 0.3s ease',
       overflowY: 'auto',
-      transition: 'transform 0.3s ease',
-      transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+      padding: '20px',
       zIndex: 1000
     }}>
-      <div style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0 }}>ノード編集</h2>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px'
+      }}>
+        <h3 style={{ margin: 0 }}>ノード編集</h3>
         <button 
           onClick={onClose}
           style={{
@@ -143,164 +154,155 @@ function NodeEditPanel({ node, isOpen, onClose, onSave }: NodeEditPanelProps) {
           ×
         </button>
       </div>
-      
+
       <div style={{ marginBottom: '15px' }}>
-        <label>ラベル:</label>
+        <label style={{ display: 'block', marginBottom: '5px' }}>ラベル</label>
         <input
           type="text"
           value={editedNode.label}
-          onChange={(e) => setEditedNode({...editedNode, label: e.target.value})}
-          style={{ width: '100%', marginTop: '5px', padding: '5px' }}
+          onChange={e => setEditedNode(prev => prev ? { ...prev, label: e.target.value } : null)}
+          style={{
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px'
+          }}
         />
       </div>
 
       <div style={{ marginBottom: '15px' }}>
-        <label>タイプ:</label>
-        <select
-          value={editedNode.type || 'transform'}
-          onChange={(e) => setEditedNode({...editedNode, type: e.target.value as NodeData['type']})}
-          style={{ width: '100%', marginTop: '5px', padding: '5px' }}
-        >
-          <option value="source">データソース</option>
-          <option value="transform">データ変換</option>
-          <option value="output">出力</option>
-        </select>
-      </div>
-
-      <div style={{ marginBottom: '15px' }}>
-        <label>説明:</label>
+        <label style={{ display: 'block', marginBottom: '5px' }}>説明</label>
         <textarea
           value={editedNode.description || ''}
-          onChange={(e) => setEditedNode({...editedNode, description: e.target.value})}
-          style={{ width: '100%', marginTop: '5px', padding: '5px', minHeight: '100px' }}
+          onChange={e => setEditedNode(prev => prev ? { ...prev, description: e.target.value } : null)}
+          style={{
+            width: '100%',
+            padding: '8px',
+            border: '1px solid #ddd',
+            borderRadius: '4px',
+            minHeight: '100px'
+          }}
         />
       </div>
 
       <div style={{ marginBottom: '15px' }}>
-        <label>プロパティ:</label>
-        {properties.map((prop, index) => (
-          <div key={index} style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+        <label style={{ display: 'block', marginBottom: '5px' }}>プロパティ</label>
+        {Object.entries(editedNode.properties || {}).map(([key, value]) => (
+          <div key={key} style={{ 
+            display: 'flex', 
+            gap: '10px',
+            marginBottom: '5px' 
+          }}>
             <input
-              placeholder="キー"
-              value={prop.key}
-              onChange={(e) => {
-                const newProps = [...properties];
-                newProps[index].key = e.target.value;
-                setProperties(newProps);
+              type="text"
+              value={key}
+              disabled
+              style={{
+                width: '40%',
+                padding: '8px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                backgroundColor: '#f5f5f5'
               }}
-              style={{ flex: 1, padding: '5px' }}
             />
             <input
-              placeholder="値"
-              value={prop.value}
-              onChange={(e) => {
-                const newProps = [...properties];
-                newProps[index].value = e.target.value;
-                setProperties(newProps);
+              type="text"
+              value={value}
+              onChange={e => handlePropertyChange(key, e.target.value)}
+              style={{
+                width: '60%',
+                padding: '8px',
+                border: '1px solid #ddd',
+                borderRadius: '4px'
               }}
-              style={{ flex: 1, padding: '5px' }}
             />
-            <button onClick={() => {
-              setProperties(properties.filter((_, i) => i !== index));
-            }}>削除</button>
           </div>
         ))}
-        <button 
-          onClick={() => setProperties([...properties, { key: '', value: '' }])}
-          style={{ marginTop: '10px' }}
-        >
-          プロパティを追加
-        </button>
       </div>
 
       <div style={{ marginBottom: '15px' }}>
-        <label>パスプロパティ:</label>
-        {pathProperties.map((prop, index) => (
-          <div key={index} style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+        <label style={{ display: 'block', marginBottom: '5px' }}>パスプロパティ</label>
+        {Object.entries(editedNode.pathProperties || {}).map(([key, value]) => (
+          <div key={key} style={{ 
+            display: 'flex', 
+            gap: '10px',
+            marginBottom: '5px' 
+          }}>
             <input
-              placeholder="キー"
-              value={prop.key}
-              onChange={(e) => {
-                const newProps = [...pathProperties];
-                newProps[index].key = e.target.value;
-                setPathValidationStates(prev => ({
-                  ...prev,
-                  [prop.key]: null
-                }));
-                setPathProperties(newProps);
-              }}
-              style={{ flex: 1, padding: '5px' }}
-            />
-            <input
-              placeholder="パス"
-              value={prop.value}
-              onChange={(e) => {
-                const newProps = [...pathProperties];
-                newProps[index].value = e.target.value;
-                setPathValidationStates(prev => ({
-                  ...prev,
-                  [prop.key]: null
-                }));
-                setPathProperties(newProps);
-              }}
-              style={{ 
-                flex: 1, 
-                padding: '5px',
-                borderColor: prop.key ? getValidationColor(prop.key) : undefined
-              }}
-            />
-            <button
-              onClick={() => {
-                console.log('Check button clicked for:', prop);
-                handleCheckPath(prop);
-              }}
-              disabled={!prop.key || !prop.value}
+              type="text"
+              value={key}
+              disabled
               style={{
-                padding: '5px 10px',
-                backgroundColor: '#f0f0f0',
-                border: '1px solid #ccc',
+                width: '40%',
+                padding: '8px',
+                border: '1px solid #ddd',
                 borderRadius: '4px',
-                cursor: prop.key && prop.value ? 'pointer' : 'not-allowed'
+                backgroundColor: '#f5f5f5'
               }}
-            >
-              確認
-            </button>
-            <button onClick={() => {
-              setPathProperties(pathProperties.filter((_, i) => i !== index));
-              setPathValidationStates(prev => {
-                const newState = { ...prev };
-                delete newState[prop.key];
-                return newState;
-              });
-            }}>削除</button>
+            />
+            <input
+              type="text"
+              value={value}
+              onChange={e => handlePathPropertyChange(key, e.target.value)}
+              style={{
+                width: '60%',
+                padding: '8px',
+                border: '1px solid #ddd',
+                borderRadius: '4px'
+              }}
+            />
           </div>
         ))}
-        <button 
-          onClick={() => setPathProperties([...pathProperties, { key: '', value: '', type: 'local' }])}
-          style={{ marginTop: '10px' }}
-        >
-          パスプロパティを追加
-        </button>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
-        <button onClick={onClose}>キャンセル</button>
+      {isDatasetNode && (
+        <div style={{ marginBottom: '15px' }}>
+          <DatasetVersionControl
+            versions={versions}
+            currentVersion={currentVersion}
+            onVersionCreate={handleVersionCreate}
+            onVersionSwitch={switchVersion}
+            onVersionDelete={deleteVersion}
+            onExport={handleVersionExport}
+            onImport={handleVersionImport}
+          />
+        </div>
+      )}
+
+      <div style={{
+        marginTop: '20px',
+        display: 'flex',
+        gap: '10px',
+        justifyContent: 'flex-end'
+      }}>
         <button 
           onClick={handleSave}
           style={{
+            padding: '8px 16px',
             backgroundColor: '#4CAF50',
             color: 'white',
             border: 'none',
-            padding: '5px 15px',
             borderRadius: '4px',
             cursor: 'pointer'
           }}
         >
           保存
         </button>
+        <button 
+          onClick={onClose}
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#f0f0f0',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          キャンセル
+        </button>
       </div>
     </div>
   );
-}
+};
 
 export default NodeEditPanel;

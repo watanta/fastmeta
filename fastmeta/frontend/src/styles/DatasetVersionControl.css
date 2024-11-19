@@ -1,0 +1,140 @@
+.dataset-version-control {
+    padding: 15px;
+    background: #ffffff;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .dataset-version-header {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .dataset-version-header h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 1rem;
+  }
+  
+  .dataset-version-actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .dataset-version-actions button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 4px;
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background 0.3s ease;
+  }
+  
+  .dataset-version-actions button:hover {
+    background: #45a049;
+  }
+  
+  .dataset-version-actions button.delete {
+    background: #f44336;
+  }
+  
+  .dataset-version-actions button.delete:hover {
+    background: #d32f2f;
+  }
+  
+  .dataset-version-actions button:disabled {
+    background: #cccccc;
+    cursor: not-allowed;
+  }
+  
+  .dataset-version-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .dataset-version-empty {
+    padding: 15px;
+    text-align: center;
+    color: #666;
+    background: #f5f5f5;
+    border-radius: 4px;
+    font-style: italic;
+  }
+  
+  .dataset-version-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  .dataset-version-item.active {
+    border-color: #4CAF50;
+    background: #f1f8e9;
+  }
+  
+  .dataset-version-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  
+  .dataset-version-timestamp {
+    font-size: 0.85rem;
+    color: #666;
+    font-family: monospace;
+  }
+  
+  .dataset-version-path {
+    font-family: monospace;
+    font-size: 0.9rem;
+    color: #0066cc;
+    margin-bottom: 6px;
+    word-break: break-all;
+  }
+  
+  .dataset-version-description {
+    font-size: 0.9rem;
+    color: #333;
+    margin-bottom: 8px;
+    line-height: 1.4;
+  }
+  
+  .dataset-version-metadata {
+    display: flex;
+    gap: 15px;
+    font-size: 0.85rem;
+    color: #666;
+  }
+  
+  .dataset-version-metadata span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  /* アニメーション */
+  .dataset-version-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* レスポンシブ対応 */
+  @media (max-width: 768px) {
+    .dataset-version-item-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+    }
+  
+    .dataset-version-actions {
+      width: 100%;
+      justify-content: flex-end;
+    }
+  }

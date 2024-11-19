@@ -75,8 +75,6 @@ function DataLineage() {
   };
 
   useEffect(() => {
-    // サンプルデータの定義
-// サンプルデータの定義
     const initialNodes = [
       { 
         id: 1, 
@@ -85,8 +83,8 @@ function DataLineage() {
         description: 'ソースの説明',
         properties: { 'データ形式': 'CSV', '更新頻度': '日次' },
         pathProperties: {
-          'configFile': '/home/watanabe/fastmeta/fastmeta/backend/package.json',  // 実在するパス
-          'dataPath': '/home/watanabe/fastmeta/fastmeta/backend/not_exists.csv'   // 存在しないパス
+          'configFile': '/home/watanabe/fastmeta/fastmeta/backend/package.json',
+          'dataPath': '/home/watanabe/fastmeta/fastmeta/backend/not_exists.csv'
         }
       },
       { 
@@ -96,8 +94,8 @@ function DataLineage() {
         description: '変換処理の説明',
         properties: { '処理タイプ': '集計', '出力形式': 'JSON' },
         pathProperties: {
-          'scriptDir': '/home/watanabe/fastmeta/fastmeta/src',           // 実在するパス
-          'logFile': '/home/watanabe/fastmeta/fastmeta/not_exist_src'   // 存在しないパス
+          'scriptDir': '/home/watanabe/fastmeta/fastmeta/src',
+          'logFile': '/home/watanabe/fastmeta/fastmeta/not_exist_src'
         }
       },
       { 
@@ -107,13 +105,12 @@ function DataLineage() {
         description: '出力の説明',
         properties: { '保存先': 'S3', 'フォーマット': 'Parquet' },
         pathProperties: {
-          'readmeFile': '/home/watanabe/fastmeta/fastmeta/README.md',         // 実在するパス
-          'outputPath': '/home/watanabe/fastmeta/fastmeta/not_exits_README.md' // 存在しないパス
+          'readmeFile': '/home/watanabe/fastmeta/fastmeta/README.md',
+          'outputPath': '/home/watanabe/fastmeta/fastmeta/not_exits_README.md'
         }
       }
     ];
 
-    // 各ノードにスタイルを適用
     const nodesWithStyles = initialNodes.map(node => ({
       ...node,
       ...getNodeStyle(node.type)
@@ -128,12 +125,11 @@ function DataLineage() {
     setNodesDataSet(nodes);
     setEdgesDataSet(edges);
 
-    // 描画オプション
     const options: Options = {
       nodes: {
         borderWidth: 2,
         margin: 10,
-        size: 30,        // ノードのサイズ
+        size: 30,
         font: {
           size: 14,
           color: '#333333',
@@ -169,12 +165,10 @@ function DataLineage() {
       }
     };
 
-    // ネットワークの描画
     const container = document.getElementById('network');
     if (container && !networkRef.current) {
       networkRef.current = new Network(container, { nodes, edges }, options);
 
-      // ダブルクリックイベントの設定
       networkRef.current.on('doubleClick', (params) => {
         if (params.nodes.length > 0) {
           const nodeId = params.nodes[0];
@@ -289,21 +283,18 @@ function DataLineage() {
         const baseStyle = getNodeStyle(node.type);
         
         if (nodeIds.length === 0) {
-          // 検索結果がない場合は元のスタイルに戻す
           nodesDataSet.update({
             id: node.id,
             ...baseStyle,
             opacity: undefined
           });
         } else if (nodeIds.includes(node.id)) {
-          // 検索にマッチしたノード
           nodesDataSet.update({
             id: node.id,
             ...baseStyle,
             opacity: 1
           });
         } else {
-          // マッチしなかったノード
           nodesDataSet.update({
             id: node.id,
             ...baseStyle,
@@ -313,7 +304,6 @@ function DataLineage() {
       });
 
       if (nodeIds.length > 0) {
-        // マッチしたノードにフォーカス
         networkRef.current.focus(nodeIds[0], {
           scale: 1,
           animation: {
@@ -385,12 +375,12 @@ function DataLineage() {
       </div>
 
       <div id="network" style={{ 
-        flex: 1,
-        border: '1px solid #ddd',
-        marginRight: isModalOpen ? '400px' : '0',
-        transition: 'margin-right 0.3s ease',
-        overflow: 'hidden'
-      }} />
+      flex: 1,
+      border: '1px solid #ddd',
+      marginRight: isModalOpen ? '400px' : '0',
+      transition: 'margin-right 0.3s ease',
+      overflow: 'hidden'
+    }} />
       
       <NodeEditPanel
         node={selectedNode}
@@ -404,5 +394,4 @@ function DataLineage() {
     </div>
   );
 }
-
 export default DataLineage;
